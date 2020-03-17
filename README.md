@@ -1,1 +1,1 @@
-# s-and-p-500-analysis
+# Time Series Analysis of S&P 500 
