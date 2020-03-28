@@ -1,0 +1,62 @@
+---
+title: "Analysis"
+author: "Group D8"
+date: "3/16/2020"
+output: pdf_document
+---
+
+```{r setup, message = FALSE, warning = FALSE}
+library(data.table)
+library(ggplot2)
+library(forecast)
+library(tseries)
+```
+
+
+```{r sp500}
+# DEC 1927 - FEB 2020
+sp500 <- fread('data/GSPC.csv', select = c('Date', 'Close'))
+# JAN 2016 - DEC 2019
+sp500 <- sp500[986:1105, -1]
+sp500 <- ts(data = sp500, start = c(2010, 1), frequency = 12)
+```
+
+## Including Plots
+
+```{r time series plots}
+autoplot(sp500) +
+  xlab("Month") + ylab("Closing Price (US$)") +
+  ggtitle("S&P 500 (monthly ending 30 December 2019)")
+```
+
+```{r}
+ggAcf(sp500)
+```
+
+```{r}
+sp500_diff <- diff(sp500)
+autoplot(sp500_diff) +
+  xlab("Month") + ylab("Closing Price Diff (US$)") +
+  ggtitle("S&P 500 (monthly ending 30 December 2019)")
+ggAcf(sp500_diff)
+ggPacf(sp500_diff)
+```
+
+```{r}
+sp500_diff_2 <- diff(sp500, 2)
+autoplot(sp500_diff_2) +
+  xlab("Month") + ylab("Closing Price Diff (US$)") +
+  ggtitle("S&P 500 (monthly ending 30 December 2019)")
+ggAcf(sp500_diff_2)
+ggPacf(sp500_diff_2)
+```
+
+```{r}
+sp500_diff_3 <- diff(sp500, 3)
+autoplot(sp500_diff_3) +
+  xlab("Month") + ylab("Closing Price Diff (US$)") +
+  ggtitle("S&P 500 (monthly ending 30 December 2019)")
+ggAcf(sp500_diff_3)
+ggPacf(sp500_diff_3)
+```
+
