@@ -1,0 +1,254 @@
+---
+title: "Group Project Report"
+author: "Group D8"
+date: "3/16/2020"
+output: pdf_document
+---
+
+
+
+```{r setup, message = FALSE, warning = FALSE}
+library(dplyr)
+library(forecast)
+library(ggfortify)
+library(ggplot2)
+library(quantmod)
+options('getSymbols.warning4.0' = F)
+```
+
+
+
+### Using data from Yahoo! Finance
+
+```{r Load data}
+getSymbols(Symbols = '^GSPC',
+           src     = 'yahoo',
+           auto.assign = T,
+           from    = '2018-01-01',
+           to      = '2020-01-01')
+data <- GSPC[, 'GSPC.Close']
+str(data)
+head(data)
+tail(data)
+sp500 <- ts(data)
+```
+
+
+
+## Time Series Plot
+
+```{r time series plot}
+sp500 %>% autoplot +
+  xlab(label = 'Time') +
+  ylab(label = 'Closing Price (US$)') +
+  ggtitle(label = 'S&P 500 Time Series Plot')
+```
+
+
+
+## ACF Plot
+
+```{r}
+sp500 %>% ggAcf +
+  ggtitle(label = 'S&P 500 ACF Plot')
+```
+
+ACF plot shows a very slow decay in time suggesting that the series might not be stationary.
+
+
+
+## PACF Plot
+
+```{r}
+sp500 %>% ggPacf +
+  ggtitle(label = 'S&P 500 PACF Plot')
+```
+
+
+
+### Portmanteau Test
+
+```{r}
+sp500 %>% Box.test(lag = 25, type = 'Box-Pierce')
+```
+
+The p-value of the portmanteau test for residuals is less than 0.05. Therefore, we have sufficient evidence to reject the null hypothesis that the series is white noise.
+
+
+
+## Take first differences to remove non-stationary component
+
+```{r}
+sp500_diff <- sp500 %>% diff(lag = 1)
+```
+
+
+
+## First Differenced Time Series Plot
+
+```{r}
+sp500_diff %>% autoplot +
+  xlab(label = 'Time') +
+  ylab(label = 'Closing Price (US$)') +
+  ggtitle(label = 'First Differenced S&P 500')
+```
+
+The differenced series plot shows variation without apparend trend.
+
+
+
+## First Difference ACF Plot
+
+```{r}
+sp500_diff %>% ggAcf +
+  ggtitle(label = 'First Differenced S&P 500 ACF Plot')
+```
+
+ACF plot shows significant values around lower lags and the values seem to decay slowly in time.
+
+
+
+## First Difference PACF Plot
+
+```{r}
+sp500_diff %>% ggPacf +
+  ggtitle(label = 'First Differenced S&P 500 PACF Plot')
+```
+
+
+
+### Portmanteau Test
+
+```{r}
+sp500_diff %>% Box.test(lag = 25, type = 'Box-Pierce')
+```
+
+The p-value of the portmanteau test for residuals is greater than 0.05. Therefore, we do not have sufficient evidence to reject the null hypothesis that the differenced series is white noise.
+
+
+
+## Split data into train and validation set
+
+There are 251 observations in 2018 and 252 observations in 2019. Thus, we will have 250 first differenced values for 2018 and 251 for 2019. We will hold out the last 5 first differenced values for each year as validation set.
+
+```{r}
+# Using 2 folds (~250 rolling window)
+train_18 <- sp500_diff[1:245]
+val_18 <- sp500_diff[246:250]
+train <- sp500_diff[1:497]
+val <- sp500_diff[498:502]
+```
+
+
+
+## Time Series Cross Validation for Model Selection
+
+```{r}
+ar_order <- vector()
+ma_order <- vector()
+aic <- vector()
+mspe <- vector()
+index <- 0
+for (p in 0:6) {
+  for (q in 0:(6 - p)) {
+    index <- index + 1
+    ar_order[index] <- p
+    ma_order[index] <- q
+    # 2018
+    model_18 <- arima(x = train_18,
+                      order = c(p, 0, q))
+    model_18_pred <- predict(model_18, 
+                             n.ahead = 5)$pred
+    mspe_18 <- mean((val_18 - model_18_pred)^2)
+    # 2018-2019
+    model_1819 <- arima(x = train,
+                        order = c(p, 0, q))
+    model_1819_pred <- predict(model_1819,
+                               n.ahead = 5)$pred
+    mspe_1819 <- mean((val - model_1819_pred)^2)
+    # Save mean scores
+    aic[index] <- mean(c(model_18$aic, model_1819$aic))
+    mspe[index] <- mean(c(mspe_18, mspe_1819))
+  }
+}
+order <- order(mspe)
+result <- data.frame(p = ar_order[order],
+                     q = ma_order[order],
+                     AIC = aic[order],
+                     MSPE = mspe[order])
+print(distinct(result)[1:10, ])
+```
+
+From the result data frame, we can see that the model ARMA(2, 2) has the lowest mean squared prediction error.
+
+
+
+## Fit best model on the full train data
+
+```{r}
+best_model <- arima(sp500_diff, order = c(2, 0, 2))
+summary(best_model)
+```
+
+
+
+## Residual Analysis
+
+```{r}
+best_model %>% ggtsdiag
+```
+
+We can see that there is no pattern apparent in the residuals analysis plot. The acf values are not significant for lags other than 0. THe p-values for Ljung-Box test are also large suggesting nothing untoward about the fit of the model.
+
+
+
+## Forecasting
+
+### Retrieve the next 5 closing prices
+
+```{r}
+getSymbols(Symbols = '^GSPC',
+           src     = 'yahoo',
+           auto.assign = T,
+           from    = '2019-12-31',
+           to      = '2020-01-09')
+head(GSPC)
+data <- ts(GSPC[, 'GSPC.Close'])
+test <- data[2:6]
+test_diff <- diff(data)[1:5]
+```
+
+
+
+### Evaluate MSE
+
+```{r}
+forecast <- predict(best_model, n.ahead = 5)
+forecast_pred <- forecast$pred
+mse_diff <- mean((test_diff - forecast_pred)^2)
+paste('First Differenced Mean Squared Error:', mse_diff)
+
+last <- sp500[length(sp500)]
+pred <- rep(Inf, 5)
+for (x in 1:5) {
+  pred[x] <- last + forecast_pred[x]
+}
+mse <- mean((test - pred)^2)
+paste('Mean Squared Error:', mse)
+```
+
+
+
+### The first 5 actual closing prices in 2020
+
+```{r}
+print(test)
+```
+
+
+
+### The first 5 predicted closing prices in 2020
+
+```{r}
+print(pred)
+```
