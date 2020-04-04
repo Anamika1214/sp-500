@@ -95,7 +95,7 @@ nfolds <- length(sp500) - 1
 # Leave-one-out
 # kfolds <- 21:nfolds
 # 12-Fold (~1 month rolling window)
-kfolds <- round(seq(21, nfolds, length.out = 12))
+kfolds <- round(seq(5, nfolds, length.out = 52))
 
 # For Progress Bar window:
 pb <- tkProgressBar(max = length(kfolds))
@@ -120,6 +120,8 @@ score <- foreach(k = kfolds, .options.snow = opts, .packages = c('forecast')) %d
   # initialize data.frame for each thread
   spe <- data.frame(matrix(0, 5, 5), row.names = c('0', '1', '2', '3', '4'))
   colnames(spe) <- rownames(spe)
+  aic <- data.frame(matrix(0, 5, 5), row.names = c('0', '1', '2', '3', '4'))
+  colnames(aic) <- rownames(aic)
   # Split sp500 data into train and validation set
   train <- sp500[1:k]
   validation <- sp500[k + 1]
@@ -127,34 +129,52 @@ score <- foreach(k = kfolds, .options.snow = opts, .packages = c('forecast')) %d
     for (q in 0:4) {
       if (p == 0 && q == 0) next # Skip ARIMA(0, 1, 0)
       model <- fit_arima(x = train, p, q)
+      aic[as.character(p), as.character(q)] <- model$aic
       y_hat <- forecast(model, h = 1)$mean[1]
       spe[as.character(p), as.character(q)] <- (y_hat - validation)^2
     }
   }
-  return(spe)
+  return(list(spe, aic))
 }
 close(pb)
 
-rmspe <- sqrt(Reduce('+', score) / length(score))
-result <- data.frame(matrix(ncol = 3, nrow = 0))
-colnames(result) <- c('p', 'q', 'RMSPE')
+rmspe_list <- sapply(score, function(x) x[1])
+rmspe <- sqrt(Reduce('+', rmspe_list) / length(score))
+
+aic_list <- sapply(score, function(x) x[2])
+aic <- Reduce('+', aic_list) / length(score)
+
+result <- data.frame(matrix(ncol = 4, nrow = 0))
+colnames(result) <- c('p', 'q', 'RMSPE', 'AIC')
 for (i in 1:5) {
   for (j in 1:5) {
     if (i == 1 && j == 1) next
-    result[nrow(result) + 1,] <- c(i - 1, j - 1, rmspe[i, j])
+    result[nrow(result) + 1,] <- c(i - 1, j - 1, rmspe[i, j], aic[i, j])
   }
 }
+```
+
+
+## Best models based on RMSPE
+
+```{r}
 print(result[order(result$RMSPE)[1:5], ])
 ```
 
-From the result table, we can see that the model ARIMA(2, 1, 0) has the lowest mean squared prediction error.
 
+## Best models based on AIC
+
+```{r}
+print(result[order(result$AIC)[1:5], ])
+```
+
+Best model: ARIMA(1, 1, 0)
 
 
 ## Fit best model on the full train data
 
 ```{r}
-best_model <- Arima(sp500, order = c(2, 1, 0), include.constant = T)
+best_model <- Arima(sp500, order = c(1, 1, 0), include.constant = T)
 summary(best_model)
 ```
 
