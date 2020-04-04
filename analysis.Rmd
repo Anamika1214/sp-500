@@ -16,7 +16,7 @@ library(quantmod)
 library(tcltk)
 options('getSymbols.warning4.0' = F)
 ```
-
+We aim to predict the daily closing values of The S&P 500 Index from 2020–01–02 to 2020–01–08. In this case, we will use one year of historical closing values for S&P 500 from 2019–01–01 to 2020–01–01, which can be accessed through yahoo finance. After downloading, the dataset looks like this:
 
 
 ### Using data from Yahoo! Finance
@@ -55,7 +55,7 @@ PACF cuts off at lag 1
 Box.test(sp500, lag = 25, type = 'Box-Pierce')
 ```
 
-The p-value of the portmanteau test for residuals is less than 0.05. Therefore, we have sufficient evidence to reject the null hypothesis that the series is white noise.
+The p-value of the portmanteau test for residuals is less than 0.05. Therefore, we have sufficient evidence to reject the null hypothesis that the series is white noise. Then, to make the series stationary,  we compute the differences between consecutive observations.
 
 
 
@@ -69,7 +69,7 @@ sp500 %>%
 
 The differenced series plot shows variation without apparend trend.
 
-ACF plot shows significant values around lower lags and the values seem to decay slowly in time.
+Although both ACF and pacf plots show significant values at lag 7, 22,and 23, but they drop to zero quickly and most of values are not significant. Based on that, we could probably conclude that the series is a white noise process.
 
 
 
@@ -81,7 +81,14 @@ sp500 %>%
   Box.test(lag = 25, type = 'Box-Pierce')
 ```
 
-The p-value of the portmanteau test for residuals is greater than 0.05. Therefore, we do not have sufficient evidence to reject the null hypothesis that the differenced series is white noise.
+The p-value of the portmanteau test for residuals is greater than 0.05. Therefore, we do not have sufficient evidence to reject the null hypothesis at 5% significant level, so we can conclude that the differenced series is consistent with a white noise process. However, we need to further prove whether the white noise model can perform well in the prediction.
+
+In the next part, we will use Leave-one-out cross validation to measure the goodness of prediction for all possible models(ARMA(p,1,q) where p+q< 9). For every i = 1,...,251:
+            a) train the model on every point except i,
+               compute the test error on the held out point.
+            b) Average the test errors
+            
+To evaluate the effectiveness of our methods, we will use the root mean square error (RMSE) and Akaike information criterion (AIC) metrics. For both metrics, the lower the value, the better the prediction.
 
 
 
@@ -168,7 +175,7 @@ print(result[order(result$RMSPE)[1:5], ])
 print(result[order(result$AIC)[1:5], ])
 ```
 
-Best model: ARIMA(1, 1, 0)
+Best model: ARIMA(1, 1, 0), because it has the lowest RMSPE, and the second lowest AIC. 
 
 
 ## Fit best model on the full train data
@@ -190,7 +197,7 @@ ggtsdiag(best_model)
 checkresiduals(best_model, lag = 25)
 ```
 
-We can see that there is no pattern apparent in the residuals analysis plot. The acf values are not significant for lags other than 0. THe p-values for Ljung-Box test are also large suggesting nothing untoward about the fit of the model.
+We can see that there is no pattern apparent in the residuals analysis plot. The acf values are not significant for lags other than 0. THe p-values for Ljung-Box test are also large suggesting nothing untoward about the fit of the model.Hence, we will use the ARIMA(1,1,0) to forcast the next 5 closing price of S&P 500, which are the closing values from 2020–01–02 to 2020–01–08.
 
 
 
@@ -230,7 +237,7 @@ pred <- as.vector(forecast$mean)
 accuracy(pred, test)
 ```
 
-
+The Root Mean Squared Error is 12.31737, and we also obseved all actual values are lying between the 95% prediction confidence interval. Thus, the ARIMA(1,1,0) seems to perform well in the prediction. 
 
 ### Prediction vs Actual
 
