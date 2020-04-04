@@ -1,0 +1,230 @@
+---
+title: "Group Project Report"
+author: "Group D8"
+date: "3/16/2020"
+output: pdf_document
+---
+
+
+
+```{r setup, message = FALSE, warning = FALSE}
+library(doSNOW)
+library(forecast)
+library(ggfortify)
+library(parallel)
+library(quantmod)
+library(tcltk)
+options('getSymbols.warning4.0' = F)
+```
+
+
+
+### Using data from Yahoo! Finance
+
+```{r Load data}
+getSymbols(Symbols = '^GSPC',
+           src     = 'yahoo',
+           auto.assign = T,
+           from    = '2019-01-01',
+           to      = '2020-01-01')
+data <- GSPC[, 'GSPC.Close']
+head(data)
+tail(data)
+sp500 <- ts(data)
+```
+
+
+
+## Time Series Plot
+
+```{r time series plot}
+ggtsdisplay(sp500, main = 'S&P 500 Index Closing Price')
+```
+
+The time series plot shows an increasing linear trend with no obvious seasonality.
+
+ACF plot shows a very slow decay in time suggesting that the series might not be stationary.
+
+PACF cuts off at lag 1
+
+
+
+### Portmanteau Test
+
+```{r}
+Box.test(sp500, lag = 25, type = 'Box-Pierce')
+```
+
+The p-value of the portmanteau test for residuals is less than 0.05. Therefore, we have sufficient evidence to reject the null hypothesis that the series is white noise.
+
+
+
+## First Differenced Time Series Plot
+
+```{r}
+sp500 %>%
+  diff() %>%
+  ggtsdisplay(main = 'First Differenced S&P 500 Index Closing Price')
+```
+
+The differenced series plot shows variation without apparend trend.
+
+ACF plot shows significant values around lower lags and the values seem to decay slowly in time.
+
+
+
+### Portmanteau Test
+
+```{r}
+sp500 %>%
+  diff() %>%
+  Box.test(lag = 25, type = 'Box-Pierce')
+```
+
+The p-value of the portmanteau test for residuals is greater than 0.05. Therefore, we do not have sufficient evidence to reject the null hypothesis that the differenced series is white noise.
+
+
+
+## Time Series Cross Validation for Model Selection
+
+```{r}
+cluster <- makeSOCKcluster(detectCores(logical = T) - 1)
+registerDoSNOW(cluster)
+
+nfolds <- length(sp500) - 1
+# Leave-one-out
+# kfolds <- 21:nfolds
+# 12-Fold (~1 month rolling window)
+kfolds <- round(seq(21, nfolds, length.out = 12))
+
+# For Progress Bar window:
+pb <- tkProgressBar(max = length(kfolds))
+opts <- list(progress = function(n) setTkProgressBar(pb, n))
+# For console output:
+# opts <- list(progress = function(n) cat(sprintf('Fold %d is complete\n', n)))
+
+fit_arima <- function(x, p, q) {
+  model <- tryCatch({
+      return(Arima(x, order = c(p, 1, q), include.constant = T))
+  }, error = function(e) {
+    tryCatch({
+      return(Arima(x, order = c(p, 1, q), include.constant = T, method = 'ML'))
+    }, error = function(e) {
+      return(Arima(x, order = c(p, 1, q), include.constant = T, method = 'ML', transform.pars = F))
+    })
+  })
+  return(model)
+}
+
+score <- foreach(k = kfolds, .options.snow = opts, .packages = c('forecast')) %dopar% {
+  # initialize data.frame for each thread
+  spe <- data.frame(matrix(0, 5, 5), row.names = c('0', '1', '2', '3', '4'))
+  colnames(spe) <- rownames(spe)
+  # Split sp500 data into train and validation set
+  train <- sp500[1:k]
+  validation <- sp500[k + 1]
+  for (p in 0:4) {
+    for (q in 0:4) {
+      if (p == 0 && q == 0) next # Skip ARIMA(0, 1, 0)
+      model <- fit_arima(x = train, p, q)
+      y_hat <- forecast(model, h = 1)$mean[1]
+      spe[as.character(p), as.character(q)] <- (y_hat - validation)^2
+    }
+  }
+  return(spe)
+}
+close(pb)
+
+rmspe <- sqrt(Reduce('+', score) / length(score))
+result <- data.frame(matrix(ncol = 3, nrow = 0))
+colnames(result) <- c('p', 'q', 'RMSPE')
+for (i in 1:5) {
+  for (j in 1:5) {
+    if (i == 1 && j == 1) next
+    result[nrow(result) + 1,] <- c(i - 1, j - 1, rmspe[i, j])
+  }
+}
+print(result[order(result$RMSPE)[1:5], ])
+```
+
+From the result table, we can see that the model ARIMA(2, 1, 0) has the lowest mean squared prediction error.
+
+
+
+## Fit best model on the full train data
+
+```{r}
+best_model <- Arima(sp500, order = c(2, 1, 0), include.constant = T)
+summary(best_model)
+```
+
+
+
+## Residual Analysis
+
+```{r}
+ggtsdiag(best_model)
+```
+
+```{r}
+checkresiduals(best_model, lag = 25)
+```
+
+We can see that there is no pattern apparent in the residuals analysis plot. The acf values are not significant for lags other than 0. THe p-values for Ljung-Box test are also large suggesting nothing untoward about the fit of the model.
+
+
+
+## Forecasting
+
+### Retrieve the next 5 closing prices
+
+```{r}
+getSymbols(Symbols = '^GSPC',
+           src     = 'yahoo',
+           auto.assign = T,
+           from    = '2020-01-01',
+           to      = '2020-03-31')
+data <- GSPC[1:5, 'GSPC.Close']
+head(data)
+test <- as.vector(data)
+```
+
+
+
+### Forecast
+
+```{r}
+forecast <- forecast(best_model, h = 5, level = 95)
+autoplot(forecast) +
+  ggtitle(label = 'S&P 500 Index Closing Price Forecast') +
+  ylab(label = 'Price') +
+  xlab(label = 'Time')
+```
+
+
+
+### Evaluate MSE
+
+```{r}
+pred <- as.vector(forecast$mean)
+accuracy(pred, test)
+```
+
+
+
+### Prediction vs Actual
+
+```{r}
+forecast_data <- data.frame(date = index(data),
+                            price = c(pred, test),
+                            predicted = pred,
+                            actual = test)
+ggplot(forecast_data, aes(x = date, y = predicted)) + 
+  geom_line(aes(color = 'Predicted')) +
+  geom_line(aes(y = actual, color = 'Actual')) +
+  xlab(label = 'Time') +
+  ylab(label = 'Closing Price (US$)') +
+  ggtitle(label = 'S&P 500 Index Closing Price Forecast') +
+  theme(legend.title = element_blank())
+```
+
