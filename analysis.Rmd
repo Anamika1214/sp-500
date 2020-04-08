@@ -5,6 +5,18 @@ date: "3/16/2020"
 output: pdf_document
 ---
 
+## Introduction:
+
+In this project, we seek to inspect a well-known time series, the S&P 500 index, in order to identify trends and attempt to make a future forecast.
+
+Abstract
+Using one year of historical closing values from the S&P 500 index, we attempt to fit a variety of models, and analyze the trends. From the portmanteu test on the original data, we could not say that the data is not generated from a random noise process at the 5% level. To remove an upward trend, the data was differenced, but this yielded the same portmanteu test result. Using model selection, we identified the top ARIMA models to model this sequence using leave-one-out CV and RMSE and AIC as metrics. The best model by this criteria is ARIMA(1, 1, 0). Using this model, we attempt to predict the next 5 closing price values and demonstrate the comparison to the actual values.
+
+Data
+The S&P 500 Index is a collection of some of the largest US stocks from a variety of industries, weighted by their market capitalization. A closing price is the last price at which the stock was trading during the previous trading day. In the case of S&P 500, this is the last weighted calculation of the index for the trading day, calculated at 4PM ET/EDT.
+
+Models
+ARIMA models are versatile models that can account for combinations of Autoregressive models, Moving average models, and differencing. 
 
 
 ```{r setup, message = FALSE, warning = FALSE}
@@ -255,3 +267,18 @@ ggplot(forecast_data, aes(x = date, y = predicted)) +
   theme(legend.title = element_blank())
 ```
 
+## Conclusions:
+We set out to determine if there was a meaningful model that could be found, which would be able to predict future stock price of the S&P500 index. In this project, we collected 252 observations from Yahoo Finance API. The data represents the daily stock price from 2019–01–01 to 2020–01–01 (no including 104 days for the weekends when the exchange is closed). We were also able to obtain the actual stock prices for the period of 2020–01–02 to 2020–01–08 (7 values) which we will attempt to forecast using the data from 2019. The actual values compared to our forecasted values will be used as a measure of the quality of our model.
+
+Preliminary data exploration showed that the daily stock price of the S&P500 index was not a stationary series, the data plot showed an obvious upward trend, without seasonality or periodicity. Moreover, the acf showed significant correlation at all lag points. Ljung-Box test statistic was less than the critical values, therefore we concluded that the series was not a realization of a white noise (stationary) process. Before further downstream analysis, we had to transform the original, non-stationary, data series into a stationary series. 
+
+The series was transformed using diff = 1, generate a new series. When plotted, the new series data values centered around mean zero, with no obvious trend. 
+The acf and pacf plots show significant values at lag 7, 22,and 23. After doing the Ljung-Box test, we concluded that the new series is a realization from a stationary process, and that the significant values in the acf and pacf were likely to be outliers.
+
+Next we wanted to find the optimal model for forecasting. To do this, we enumerated over possible values of p and q (d = 1), constrainted by p >= 0 and p <= 4, and q >= 0, and q <= 4. We used a leave-one-out cross-validation approach quantify the accuracy of each model. The chosen model used ARIMA(1, 1, 0), because it has the lowest RMSPE (22.62201), and the second lowest AIC (1159.596). Fitting the AR(1) model to the full dataset returned an alpha coefficient of -0.0849. Residual analysis on the fitted model shows that the residuals follow a realization of a white noise process, as expected from a good fitting model.
+
+We forecasted the first five stock prices from the year 2020, from the period of 2020–01–02 to 2020–01–08 (less 1 weekend). The actual values are shown to fall within the 95% confidence interval of the forecasted values. As the time increases into the future, the confidence interval widens, as expected. Overall, we conclude that an AR(1) model is a good approximatation for the daily stock price of the S&P500 index for the year of 2019. The AR(1) model is also accuracte for forecasting purposes, up until the first week of 2020. 
+
+During post-analysis, we looked at various years through out the S&P500 data and realized that we had been extremely fortunate selecting 2019 as our training dataset. The trends in other years were not as clear and there is no guarantee that using other years as training would yield an AR(1) as the best fitted model. Furthermore, the stock market experiences various periods of extreme growth, stagnation, and crashes, however there was no such novel event during the year of 2019. Taking into account these extenuating circumstances, it is extremely unlikely that an AR(1) would be the best fitted model for the S&P500 in general.  
+
+Moving forward, we would like to try to use the entire S&P500 dataset from inception in 1926 until 2019. This may yield a more accurate model of the S&P500 stock index. However, even that model is unlikely to be able to predict market crashes like what we are currently experiencing due to the Covid-19 global pandemic. More sophisticated models which can account for anomaly detection would be necessary in order to generate a model which can accurately model the S&P500 index. 
