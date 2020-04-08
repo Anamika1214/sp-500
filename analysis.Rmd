@@ -5,19 +5,22 @@ date: "3/16/2020"
 output: pdf_document
 ---
 
-## Introduction:
+# Introduction:
 
 In this project, we seek to inspect a well-known time series, the S&P 500 index, in order to identify trends and attempt to make a future forecast.
 
-Abstract
+## Abstract
 Using one year of historical closing values from the S&P 500 index, we attempt to fit a variety of models, and analyze the trends. From the portmanteu test on the original data, we could not say that the data is not generated from a random noise process at the 5% level. To remove an upward trend, the data was differenced, but this yielded the same portmanteu test result. Using model selection, we identified the top ARIMA models to model this sequence using leave-one-out CV and RMSE and AIC as metrics. The best model by this criteria is ARIMA(1, 1, 0). Using this model, we attempt to predict the next 5 closing price values and demonstrate the comparison to the actual values.
 
-Data
-The S&P 500 Index is a collection of some of the largest US stocks from a variety of industries, weighted by their market capitalization. A closing price is the last price at which the stock was trading during the previous trading day. In the case of S&P 500, this is the last weighted calculation of the index for the trading day, calculated at 4PM ET/EDT.
+## Data
+The S&P 500 Index is a collection of some of the largest US stocks from a variety of industries, weighted by their market capitalization. A closing price is the last price at which the stock was trading during the previous trading day. In the case of S&P 500, this is the last weighted calculation of the index for the trading day, calculated at 4PM ET/EDT. In this report, we use the S&P 500 index closing price for January 1, 2019 to Dec 31st 2019 for model training, and January 2 to January 8 2020 for model prediction. 
 
-Models
-ARIMA models are versatile models that can account for combinations of Autoregressive models, Moving average models, and differencing. 
+The data source is Yahoo Finance, which we used because it is a free, trusted source for accurate stock data. We used the quantmod package (Quantitative Financial Modelling & Trading Framework for R) which has an API for importing the data from Yahoo.
 
+The S&P 500 is superior to individual stocks for modeling, as it is an aggregate -- this allows us to obtain a "big picture" in comparison to individual stocks, which are more volatile and subject to more extreme fluctuation. Our motivation for using this data was to obtain a prediction model based on historical price data. Such a model would not only be useful for profiting from market trades, but also as an indicator for US stock movement, and therefore GDP growth and economic sentiment. Of course, a simple model would be unlikely, so we used methods such as Neural Networks to model the data.  
+
+
+# Analysis:
 
 ```{r setup, message = FALSE, warning = FALSE}
 library(doSNOW)
@@ -267,7 +270,7 @@ ggplot(forecast_data, aes(x = date, y = predicted)) +
   theme(legend.title = element_blank())
 ```
 
-## Conclusions:
+# Conclusions:
 We set out to determine if there was a meaningful model that could be found, which would be able to predict future stock price of the S&P500 index. In this project, we collected 252 observations from Yahoo Finance API. The data represents the daily stock price from 2019–01–01 to 2020–01–01 (no including 104 days for the weekends when the exchange is closed). We were also able to obtain the actual stock prices for the period of 2020–01–02 to 2020–01–08 (7 values) which we will attempt to forecast using the data from 2019. The actual values compared to our forecasted values will be used as a measure of the quality of our model.
 
 Preliminary data exploration showed that the daily stock price of the S&P500 index was not a stationary series, the data plot showed an obvious upward trend, without seasonality or periodicity. Moreover, the acf showed significant correlation at all lag points. Ljung-Box test statistic was less than the critical values, therefore we concluded that the series was not a realization of a white noise (stationary) process. Before further downstream analysis, we had to transform the original, non-stationary, data series into a stationary series. 
