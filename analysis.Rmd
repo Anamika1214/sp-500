@@ -10,11 +10,11 @@ output: pdf_document
 In this project, we seek to inspect a well-known time series, the S&P 500 Index, in order to identify trends and attempt to make a future forecast.
 
 ## Abstract
-Using one year of historical closing price values from the S&P 500 Index, we attempt to fit a variety of models and analyze the trends. From the portmanteu test on the original data, we could say that the data is not generated from a random noise process at the 5% level. To remove an upward trend, the data was differenced, we could no longer reject the null hypothesis that the series is a white noise process. 
-
-TODO: Explain about all the models
+Using one year of historical closing price values from the S&P 500 Index, we attempt to fit a variety of models and analyze the trends. From the portmanteu test on the original data, we could say that the data is not generated from a random noise process at the 5% level. Thus it was reasonable to continue trying to apply different modedls. To remove an upward trend, the data was differenced, we could no longer reject the null hypothesis that the series is a white noise process. 
 
 Using cross validation, we identified the top ARIMA models to model this sequence using RMSE and AIC as metrics. The best model by this criteria is ARIMA(1, 1, 0). Using this model, we attempt to predict the next 5 closing price values and demonstrate the comparison to the actual values.
+
+In addition to ARIMA, we tried to model the data using a variety of linear and nonlinear techniques, including exonential smoothing, (Damped) Holt linear trend, cubic splines, and a feed-forward Neural Network. However, the ARIMA(1,1,0) model remained as the superior model by RMSE.
 
 ## Data
 The S&P 500 Index is a collection of some of the largest US stocks from a variety of industries, weighted by their market capitalization. A closing price is the last price at which the stock was trading during the previous trading day. In the case of S&P 500, this is the last weighted calculation of the index for the trading day, calculated at 4PM ET/EDT. In this report, we use the S&P 500 index closing price for January 1, 2019 to Dec 31st 2019 for model training, and January 2 to January 8 2020 for model prediction. 
