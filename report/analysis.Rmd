@@ -1,7 +1,10 @@
 ---
-title: 'S&P 500 Index Forecasting'
-author: 'STAT 443 Group D8'
-output: pdf_document
+title: "S&P 500 Index Forecasting"
+author: "STAT 443 Group D8"
+output:
+  md_document:
+    variant: markdown_github
+  pdf_document: default
 ---
 
 # Introduction
