@@ -7,54 +7,41 @@ output: pdf_document
 
 # Introduction:
 
-In this project, we seek to inspect a well-known time series, the S&P 500 Index, in order to identify trends and attempt to make a future forecast.
+In this project, we seek to inspect a well-known time series, the S&P 500 Index, to identify trends and attempt to make a future forecast.
 
 ## Abstract
-Using one year of historical closing price values from the S&P 500 Index, we attempt to fit a variety of models and analyze the trends. From the portmanteu test on the original data, we could say that the data is not generated from a random noise process at the 5% level. Thus it was reasonable to continue trying to apply different modedls. To remove an upward trend, the data was differenced, we could no longer reject the null hypothesis that the series is a white noise process. 
+Using one year of historical closing price values from the S&P 500 Index, we attempt to fit a variety of models and analyze the trends. From the portmanteau test on the original data, we could say that the data is not generated from a random noise process at the 5% level. Thus it was reasonable to continue trying to apply different models. To remove an upward trend, the data was differenced, we could no longer reject the null hypothesis that the series is a white noise process. 
 
-Using cross validation, we identified the top ARIMA models to model this sequence using RMSE and AIC as metrics. The best model by this criteria is ARIMA(1, 1, 0). Using this model, we attempt to predict the next 5 closing price values and demonstrate the comparison to the actual values.
+Using cross-validation, we identified the top ARIMA models to model this sequence using RMSE and AIC as metrics. The best model by this criteria is ARIMA(1, 1, 0). Using this model, we attempt to predict the next 5 closing price values and demonstrate the comparison to the actual values.
 
-In addition to ARIMA, we tried to model the data using a variety of linear and nonlinear techniques, including exonential smoothing, Holt linear trend, cubic splines, and a feed-forward Neural Network. However, the ARIMA(1,1,0) model remained as the superior model by RMSE.
+In addition to ARIMA, we tried to model the data using a variety of linear and nonlinear techniques, including exponential smoothing, Holt linear trend, cubic splines, and a feed-forward Neural Network. However, the ARIMA(1,1,0) model remained as the superior model by RMSE.
 
 ## Data
-The S&P 500 Index is a collection of some of the largest US stocks from a variety of industries, weighted by their market capitalization. A closing price is the last price at which the stock was trading during the previous trading day. In the case of S&P 500, this is the last weighted calculation of the index for the trading day, calculated at 4PM ET/EDT. In this report, we use the S&P 500 index closing price for January 1, 2019 to Dec 31st 2019 for model training, and January 2 to January 8 2020 for model prediction. 
+The S&P 500 Index is a collection of some of the largest US stocks from a variety of industries, weighted by their market capitalization. A closing price is the last price at which the stock was trading during the previous trading day. In the case of the S&P 500, this is the last weighted calculation of the index for the trading day, calculated at 4PM ET/EDT. In this report, we use the S&P 500 index closing price for January 1, 2019 to December 31, 2019 for model training, and January 2 to January 8, 2020 for model prediction. 
 
 The data source is Yahoo Finance, which we used because it is a free, trusted source for accurate stock data. We used the quantmod package (Quantitative Financial Modelling & Trading Framework for R) which has an API for importing the data from Yahoo.
 
 The S&P 500 is superior to individual stocks for modeling, as it is an aggregate -- this allows us to obtain a "big picture" in comparison to individual stocks, which are more volatile and subject to more extreme fluctuation. Our motivation for using this data was to obtain a prediction model based on historical price data. Such a model would not only be useful for profiting from market trades, but also as an indicator for US stock movement, and therefore GDP growth and economic sentiment. Of course, a simple model would be unlikely, so we used methods such as Neural Networks to model the data.  
 
 
-# Analysis:
+# Setup
 
 ```{r setup, message = FALSE, warning = FALSE}
-library(doSNOW)
-library(forecast)
-library(ggfortify)
-library(gtools)
-library(parallel)
-library(quantmod)
-library(tcltk)
-options('getSymbols.warning4.0' = F)
-```
-
-We aim to predict the daily closing values of The S&P 500 Index from 2020–01–02 to 2020–01–08. In this case, we will use one year of S&P 500 historical closing price values from 2019–01–01 to 2019–12–31, which can be accessed through yahoo finance. After downloading, the dataset looks like this:
-
-
-### Using data from Yahoo! Finance
-
-```{r Load data}
-getSymbols(Symbols = '^GSPC',
-           src     = 'yahoo',
-           auto.assign = T,
-           from    = '2019-01-01',
-           to      = '2020-01-01')
-data <- GSPC[, 'GSPC.Close']
-head(data)
-tail(data)
-sp500 <- ts(data)
+library(forecast); library(ggfortify); library(quantmod); library(gtools)
+library(parallel); library(doSNOW); library(tcltk); options('getSymbols.warning4.0' = F)
+GSPC <- getSymbols('^GSPC', from = '2019-01-01', to = '2020-01-01', auto.assign = F)
+sp500 <- ts(GSPC$GSPC.Close)
 ```
 
 
+
+\newpage
+
+
+
+# Analysis
+
+We aim to predict the daily closing values of The S&P 500 Index from 2020–01–02 to 2020–01–08. In this case, we will use one year of S&P 500 historical closing price values from 2019–01–01 to 2019–12–31, which can be accessed through yahoo finance.
 
 ## Time Series Plot
 
@@ -62,13 +49,7 @@ sp500 <- ts(data)
 ggtsdisplay(sp500, main = 'S&P 500 Index Closing Price')
 ```
 
-The time series plot shows an increasing linear trend with no obvious seasonality.
-
-ACF plot shows a very slow decay in time suggesting that the series might not be stationary.
-
-PACF cuts off at lag 1
-
-
+The time series plot shows an increasing linear trend with no obvious seasonality. ACF plot shows a very slow decay in time suggesting that the series might not be stationary. PACF cuts off at lag 1
 
 ### Portmanteau Test
 
@@ -78,33 +59,35 @@ Box.test(sp500, lag = 12, type = 'Box-Pierce')
 
 The p-value of the portmanteau test for residuals is less than 0.05. Therefore, we have sufficient evidence to reject the null hypothesis that the series is white noise. 
 
+
+
+\newpage
+
+
+
 Then, to make the series stationary, we compute the differences between consecutive observations.
-
-
 
 ## First Differenced Time Series Plot
 
 ```{r}
-sp500 %>%
-  diff() %>%
-  ggtsdisplay(main = 'First Differenced S&P 500 Index Closing Price')
+sp500 %>% diff() %>% ggtsdisplay(main = 'First Differenced S&P 500 Index Closing Price')
 ```
 
 The differenced series plot shows variation without apparend trend.
 
 Although both ACF and pacf plots show significant values at lag 7, 22,and 23, they drop to zero quickly and most of values are not significant. Based on that, we could probably conclude that the series is a white noise process.
 
-
-
 ### Portmanteau Test
 
 ```{r}
-sp500 %>%
-  diff() %>%
-  Box.test(lag = 12, type = 'Box-Pierce')
+sp500 %>% diff() %>% Box.test(lag = 12, type = 'Box-Pierce')
 ```
 
 The p-value of the portmanteau test for residuals is greater than 0.05. Therefore, we do not have sufficient evidence to reject the null hypothesis at 5% significant level, so we cannot conclude that the differenced series is not a white noise process.
+
+
+
+\newpage
 
 
 
@@ -113,66 +96,28 @@ The p-value of the portmanteau test for residuals is greater than 0.05. Therefor
 In the next part, we will use four different forecasting techniques: Regression, Exponential Smoothing, Box-Jenkins Methodology, and Feedforward Neural Network.
 
 
+## Regression
 
-## Regression (Linear model and Cubic Spline)
+### Linear Regression & Cubic Spline
 
 Since our time series data has a linear trend, we will try to model it using a trend variable.
 
 ```{r}
 tslm_linear <- tslm(sp500 ~ trend)
-summary(tslm_linear)
-fcast_linear <- forecast(tslm_linear, h = 5)
-```
-
-### Forecast Plot
-
-```{r}
-autoplot(sp500) +
-  autolayer(fitted(tslm_linear), series = 'Linear') +
-  autolayer(fcast_linear, series = 'Linear') +
-  xlab('Time') +
-  ylab('Closing Stock Price') +
-  ggtitle('S&P 500 Index Forecast') +
-  guides(colour = guide_legend(title = ' '))
-```
-
-As we can see the series is not exactly linear so it might be better to use a non-linear regression like cubic spline. 
-
-```{r}
-t <- time(sp500)
-t1 <- ts(pmax(0, t - 37))
-t2 <- ts(pmax(0, t - 205))
+t <- time(sp500); t1 <- ts(pmax(0, t - 37)); t2 <- ts(pmax(0, t - 205))
 tslm_spline <- tslm(sp500 ~ t + I(t^2) + I(t^3) + I(t1^3) + I(t2^3))
-summary(tslm_spline)
-
-fcast_spline <- forecast(tslm_spline,
-                         newdata = data.frame(t = t[length(t)] + seq(5),
-                                              t1 = t1[length(t1)] + seq(5),
-                                              t2 = t2[length(t2)] + seq(5)))
-
+spline_new_data <- data.frame(t = t[length(t)] + seq(5),
+                              t1 = t1[length(t1)] + seq(5), t2 = t2[length(t2)] + seq(5))
 ```
 
-### Forecast Plot
-
-```{r}
-autoplot(sp500) +
-  autolayer(fitted(tslm_spline), series = 'Cubic Spline') +
-  autolayer(fcast_spline, series = 'Cubic Spline') +
-  xlab('Time') +
-  ylab('Closing Stock Price') +
-  ggtitle('S&P 500 Index Forecast') +
-  guides(colour = guide_legend(title = ' '))
-```
+As we can see the series is not exactly linear so it might be better to use a non-linear regression like cubic spline.
 
 ### Five-step Time Series Cross-Validation
 
-We will not be doing CV for cubic spline because we would have to determine the location and number of knots for each fold.
+We will not be doing CV for cubic spline due to the unknown knots for each training fold.
 
 ```{r}
-ff_linear <- function(x, h) {
-  forecast(tslm(x ~ trend), h = h)
-}
-e_linear <- tsCV(sp500, ff_linear, h = 5)
+e_linear <- tsCV(sp500, function(x, h) { forecast(tslm(x ~ trend), h = h) }, h = 5)
 rmse_linear <- sqrt(mean(e_linear^2, na.rm = T))
 ```
 
@@ -180,76 +125,17 @@ rmse_linear <- sqrt(mean(e_linear^2, na.rm = T))
 
 ## Exponential Smoothing
 
-### Simple Exponential Smoothing
+### Simple Exponential Smoothing & Holt's linear trend method
 
-We will use this method because it is suitable for forecasting data with no clear seasonal pattern.
-
-```{r}
-fcast_ses <- ses(sp500, h = 5, level = 95)
-summary(fcast_ses)
-```
-
-### Forecast Plot
-
-```{r}
-autoplot(sp500) +
-  autolayer(fitted(fcast_ses), series = 'SES') +
-  autolayer(fcast_ses, series = 'SES') +
-  xlab('Time') +
-  ylab('Closing Stock Price') +
-  ggtitle('S&P 500 Index Forecast') +
-  guides(colour = guide_legend(title = ' '))
-```
-
-
-
-### Holt's linear trend method
-
-```{r}
-holt_fcast <- holt(sp500, h = 5, level = 95)
-summary(holt_fcast)
-```
-
-### Forecast Plot
-
-```{r}
-autoplot(sp500) +
-  autolayer(fitted(holt_fcast), series = "Holt's") +
-  autolayer(holt_fcast, series = "Holt's") +
-  xlab('Time') +
-  ylab('Closing Stock Price') +
-  ggtitle('S&P 500 Index Forecast') +
-  guides(colour = guide_legend(title = ' '))
-```
-```{r}
-holt_fcast_damped <- holt(sp500, h = 5, level = 95, damped = T)
-summary(holt_fcast_damped)
-```
-
-### Forecast Plot
-
-```{r}
-autoplot(sp500) +
-  autolayer(fitted(holt_fcast_damped), series = "Damped Holt's") +
-  autolayer(holt_fcast_damped, series = "Damped Holt's") +
-  xlab('Time') +
-  ylab('Closing Stock Price') +
-  ggtitle('S&P 500 Index Forecast') +
-  guides(colour = guide_legend(title = ' '))
-```
-
+We will use this method because it is suitable for forecasting data with no clear seasonal pattern. Since there is no training required, we will only do model performance evaluation here.
 
 ### Five-step Time Series Cross-Validation
 
 ```{r}
 tsCV_ses <- tsCV(sp500, ses, h = 5)
 rmse_ses <- sqrt(mean(tsCV_ses^2, na.rm = T))
-
 tsCV_holt <- tsCV(sp500, holt, h = 5)
 rmse_holts <- sqrt(mean(tsCV_holt^2, na.rm = T))
-
-tsCV_holt_damped <- tsCV(sp500, holt, damped = T, h = 5)
-rmse_damped_holts <- sqrt(mean(tsCV_holt_damped^2, na.rm = T))
 ```
 
 
@@ -268,15 +154,18 @@ We will use a five-step time series cv to measure the goodness of prediction for
 
 To evaluate the effectiveness of our methods, we will use the root mean square error (RMSE) and Akaike information criterion (AIC) metrics. For both metrics, the lower the value, the better the prediction.
 
-```{r}
-cl <- makeSOCKcluster(detectCores() - 1)
-registerDoSNOW(cl)
 
+
+\newpage
+
+
+
+```{r}
+cl <- makeSOCKcluster(detectCores() - 1); registerDoSNOW(cl)
 order <- permutations(5, 2, 0:4, repeats = T)
 order <- lapply(1:nrow(order), function(i) order[i, ]) # Convert matrix to list
 pb <- tkProgressBar(max = length(order))
 opts <- list(progress = function(n) setTkProgressBar(pb, n))
-
 score <- foreach(pq = order, .options.snow = opts, .packages = c('forecast')) %dopar% {
   p <- pq[1]
   q <- pq[2]
@@ -288,26 +177,22 @@ score <- foreach(pq = order, .options.snow = opts, .packages = c('forecast')) %d
   rmspe <- sqrt(mean(e^2, na.rm = T))
   return(c(p, q, aic, rmspe))
 }
-
-close(pb)
-stopCluster(cl)
-
+close(pb); stopCluster(cl)
 result <- data.frame(Reduce(rbind, score), row.names = NULL)
 colnames(result) <- c('p', 'q', 'AIC', 'RMSE')
-print(result)
 ```
 
 
 ### Best ARIMA models based on RMSPE
 
 ```{r}
-head(result[order(result$RMSE),])
+print(result[order(result$RMSE)[1:4], ])
 ```
 
 ### Best ARIMA models based on AIC
 
 ```{r}
-head(result[order(result$AIC),])
+print(result[order(result$AIC)[1:4], ])
 ```
 
 Best model: ARIMA(1, 1, 0), because it has the lowest RMSPE, and an AIC value that is very close to the second lowest.
@@ -317,31 +202,19 @@ Best model: ARIMA(1, 1, 0), because it has the lowest RMSPE, and an AIC value th
 
 ```{r}
 arima_model <- Arima(sp500, order = c(1, 1, 0), include.constant = T)
-summary(arima_model)
-rmse_arima <- min(result$RMSE)
+rmse_arima <- min(result$RMSE, na.rm = T)
 ```
 
-### Forecast Plot
 
-```{r}
-fcast_arima <- forecast(arima_model, h = 5, level = 95)
-autoplot(sp500) +
-  autolayer(fitted(fcast_arima), series = 'ARIMA(1,1,0)') +
-  autolayer(fcast_arima, series = 'ARIMA(1,1,0)') +
-  xlab('Time') +
-  ylab('Closing Stock Price') +
-  ggtitle('S&P 500 Index Forecast') +
-  guides(colour = guide_legend(title = ' '))
-```
+
+\newpage
+
+
 
 ### Residual Analysis
 
 ```{r}
 ggtsdiag(arima_model)
-```
-
-```{r}
-checkresiduals(arima_model, lag = 12)
 ```
 
 We can see that there is no pattern apparent in the residuals analysis plot. The acf values are not significant for lags other than 0. THe p-values for Ljung-Box test are also large suggesting nothing untoward about the fit of the model. Hence, we will use the ARIMA(1,1,0) to forcast the next 5 closing price of S&P 500, which are the closing values from 2020–01–02 to 2020–01–08.
@@ -350,99 +223,77 @@ We can see that there is no pattern apparent in the residuals analysis plot. The
 
 ## Feedforward Neural Network
 
-We will use a five-step time series cv to measure the goodness of prediction for all possible models (NNAR(p,1) where 0 <= p <= 4).
-
-  For every i = 1, ..., 251:
-    a) Train the model on every point before i
-    b) Compute the test error on the held out point i
-    b) Average the test errors
-
-To evaluate the effectiveness of our methods, we will use the root mean square error (RMSE) metric. For RMSE, the lower the value, the better the prediction.
+We will use a five-step time series cv to measure the goodness of prediction for all possible models (NNAR(p,1) where 0 <= p <= 4) similar to the previous CV for ARIMA
 
 ```{r}
-cl <- makeSOCKcluster(detectCores() - 1)
-registerDoSNOW(cl)
-
-order <- 1:4
+cl <- makeSOCKcluster(detectCores() - 1); registerDoSNOW(cl); order <- 1:4
 pb <- tkProgressBar(max = length(order))
 opts <- list(progress = function(n) setTkProgressBar(pb, n))
-
 score <- foreach(p = order, .options.snow = opts, .packages = c('forecast')) %dopar% {
-  fnnetar <- function(x, h) {
-    set.seed(2020)
-    forecast(nnetar(y = x, p = p, size = 1), h = h)
-  }
+  fnnetar <- function(x, h) { set.seed(2020); forecast(nnetar(x, p = p, size = 1), h = h) }
   e <- tsCV(sp500, fnnetar, h = 5)
   rmspe <- sqrt(mean(e^2, na.rm = T))
   return(c(p, rmspe))
 }
-
-close(pb)
-stopCluster(cl)
-
-result <- data.frame(Reduce(rbind, score), row.names = NULL)
-colnames(result) <- c('p', 'RMSE')
+close(pb); stopCluster(cl)
+result <- data.frame(t(Reduce(rbind, score)[,2]), row.names = 'RMSE')
+colnames(result) <- 1:4
 print(result)
 ```
 
 Best model: NNAR(1,1), because it has the lowest RMSE.
 
-### Fit the best NNAR model
-
 ```{r}
 set.seed(2020)
-nnar_model <- nnetar(y = sp500, p = 1, size = 1, repeats = 200)
-print(nnar_model)
-rmse_nnar <- min(result$RMSE)
+nnar_model <- nnetar(y = sp500, p = 1, size = 1)
+rmse_nnar <- min(result, na.rm = T)
 ```
 
-### Forecast Plot
-
-```{r}
-fcast_nnar <- forecast(nnar_model, h = 5)
-autoplot(sp500) +
-  autolayer(fitted(fcast_nnar), series = 'NNAR(1,1)') +
-  autolayer(fcast_nnar, series = 'NNAR(1,1)') +
-  xlab('Time') +
-  ylab('Closing Stock Price') +
-  ggtitle('S&P 500 Index Forecast') +
-  guides(colour = guide_legend(title = ' '))
-```
 
 
 
 # Forecasting
 
-
-### CV RMSE Comparison
-
-```{r}
-rmse_cv <- setNames(data.frame(rmse_linear, rmse_ses, rmse_holts, rmse_damped_holts, rmse_arima, rmse_nnar, row.names = 'RMSE'),
-                    c('Linear Regression', 'SES', "Holt's", "Damped Holt's", "ARIMA", 'NNAR'))
-print(rmse_cv)
+```{r, warning = FALSE}
+fcast_linear <- forecast(tslm_linear, h = 5, level = 95)
+fcast_spline <- forecast(tslm_spline, newdata = spline_new_data)
+fcast_ses <- ses(sp500, h = 5, level = 95)
+fcast_holt <- holt(sp500, h = 5, level = 95)
+fcast_arima <- forecast(arima_model, h = 5, level = 95)
+fcast_nnar <- forecast(nnar_model, h = 5)
+autoplot(sp500) + ggtitle('S&P 500 Index Forecast') +
+  autolayer(fitted(tslm_linear),series='LM')+autolayer(fcast_linear,series='LM') +
+  autolayer(fitted(tslm_spline),series='Spline')+autolayer(fcast_spline,series='Spline') +
+  autolayer(fitted(fcast_ses),series='SES')+autolayer(fcast_ses,series='SES') +
+  autolayer(fitted(fcast_holt),series="Holt")+autolayer(fcast_holt,series="Holt") +
+  autolayer(fitted(fcast_arima),series='ARIMA')+autolayer(fcast_arima,series='ARIMA') +
+  autolayer(fitted(fcast_nnar),series='NNAR')+autolayer(fcast_nnar,series='NNAR') +
+  xlab('Time') + ylab('Closing Stock Price') + guides(colour=guide_legend(title = ' '))
 ```
 
-We can see that ARIMA has the lowest RMSE obtained from cross validation.
-We will now compare the top 3 model using the test set. Since we could not calculate the CV RMSE for cubic spline, we will evaluate it with the test set too.
 
 
-### Retrieve the next 5 closing prices (First 5 in 2020)
+\newpage
+
+
+
+## CV RMSE Comparison
 
 ```{r}
-getSymbols(Symbols = '^GSPC',
-           src     = 'yahoo',
-           auto.assign = T,
-           from    = '2020-01-01',
-           to      = '2020-03-31')
-data <- GSPC[1:5, 'GSPC.Close']
-head(data)
+print(setNames(data.frame(rmse_linear, rmse_ses, rmse_holts,
+                          rmse_arima, rmse_nnar, row.names = 'RMSE'),
+               c('LM', 'SES', "Holt's", 'ARIMA', 'NNAR')))
+```
+
+We can see that ARIMA has the lowest RMSE obtained from cross validation. We will now compare the top 3 model and Cubic Spline using the test set.
+
+
+### Evaluate MSE for Top 3 Models using the next 5 closing price values
+
+```{r}
+GSPC <- getSymbols('^GSPC', from = '2020-01-01', to = '2020-01-09', auto.assign = F)
+data <- GSPC$GSPC.Close
 test <- as.vector(data)
-```
-
-
-### Evaluate MSE for Top 3 Models
-
-```{r}
 rmse_test <- data.frame(rbind(accuracy(fcast_ses$mean, test),
                               accuracy(fcast_arima$mean, test),
                               accuracy(fcast_nnar$mean, test),
@@ -451,15 +302,21 @@ rmse_test <- data.frame(rbind(accuracy(fcast_ses$mean, test),
 print(rmse_test[order(rmse_test$RMSE), ])
 ```
 
-We can see that ARIMA has the lowest test RMSE score. Cubic Spline seems to have the worst performance here, this is not surprising as it can still be further improved by using higher of knots or we can even use smoothing splines instead so we would not need to optimize the number of knots.
+We can see that ARIMA has the lowest test RMSE score of 12.3. Cubic Spline seems to have the worst performance here, this is not surprising as it can still be further improved by using higher of knots or we can even use smoothing splines instead so we would not need to optimize the number of knots.
 
 ```{r}
 cbind(data.frame(fcast_arima), Actual = test)
 ```
 
-Our best model ARIMA has a Root Mean Squared Error of 12.31737, and we also obseved all actual values are lying between the 95% prediction confidence interval. Thus, the ARIMA(1,1,0) seems to perform well in the prediction. 
+We obseved all actual values are lying between the 95% prediction confidence interval. Thus, the ARIMA(1,1,0) seems to perform well in the prediction.
 
-### Forecast vs Actual
+
+
+\newpage
+
+
+
+## Forecast vs Actual
 
 ```{r}
 ggplot(data.frame(data), aes(x = index(data))) +
@@ -467,18 +324,17 @@ ggplot(data.frame(data), aes(x = index(data))) +
   geom_line(aes(y = fcast_arima$mean, color = 'ARIMA')) +
   geom_line(aes(y = fcast_nnar$mean, color = 'NNAR')) +
   geom_line(aes(y = fcast_ses$mean, color = 'SES')) +
-  xlab('Time') +
-  ylab('Closing Stock Price') +
-  ggtitle('S&P 500 Index Forecast vs Actual')
+  ggtitle('S&P 500 Index Forecast vs Actual') + xlab('Time') + 
+  ylab('Closing Stock Price') + guides(colour = guide_legend(title = ' '))
 ```
 
-# Conclusions:
+# Conclusion
 
 We set out to determine if there was a meaningful model that could be found, which would be able to predict future stock price of the S&P500 Index. In this project, we collected 252 observations from Yahoo Finance API. The data represents the daily stock price from 2019–01–01 to 2019–12–31 (not including 104 days for the weekends when the exchange is closed). We were also able to obtain the actual stock prices for the first five weekdays of 2020 which we will attempt to forecast using the data from 2019. The actual values compared to our forecasted values will be used as a measure of the quality of our model.
 
 Preliminary data exploration showed that the daily stock price of the S&P500 Index was not a stationary series, the data plot showed an obvious upward trend, without seasonality or periodicity. Moreover, the acf showed significant correlation at all lag points. Ljung-Box p-value was less than 0.05, therefore we rejected the null hypothesis and concluded that the series was not a realization of a white noise (stationary) process. Before further downstream analysis, we had to transform the original, non-stationary, data series into a stationary series. 
 
-The series was transformed using diff = 1, generate a new series. When plotted, the new series data values showed no obvious trend. The acf and pacf plots show significant values at lag 7, 22, and 23. After doing the Ljung-Box test (p-value greater than 0.05), we were unable to reject the null hypothesis and concluded that the new series was indeed a realization from a stationary process such that the significant values in the acf and pacf were likely to be outliers.
+The series was transformed using diff = 1, generate a new series. When plotted, the new series data values showed no obvious trend. The acf and pacf plots show significant values at lag 7, 22, and 23. After doing the Ljung-Box test (p-value greater thn 0.05), we were unable to reject the null hypothesis and concluded that the new series was indeed a realization from a stationary process such that the significant values in the acf and pacf were likely to be outliers.
 
 Next we wanted to find the optimal model for forecasting. We started with the most naive approach, before moving onward to key concepts taught in class. The first model we tried was a simple linear regression model. The linear regression accurately reflected the upward trend of the S&P500 Index data, but was unable to show the more nuanced variations. Next we tried a non-linear regression, using cubic splines. While the cubic spline regression was a better fit, we soon realized that cross-validation of a cublic spline model was extremely tedious so we did not pursue the cubic spline model any further. 
 
