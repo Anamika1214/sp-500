@@ -1,4 +1,4 @@
-# S&P 500 Index Analysis & Forecast
+# S&P 500 Index Forecast
 
 
 Introduction
