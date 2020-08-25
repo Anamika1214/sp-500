@@ -524,3 +524,4 @@ unlikely to be able to predict market crashes like what we are currently
 experiencing due to the COVID-19 global pandemic. More sophisticated
 models which can account for anomaly detection would be necessary in
 order to generate a model which can accurately model the S&P500 Index.
+
